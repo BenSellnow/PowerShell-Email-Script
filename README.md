@@ -1,0 +1,92 @@
+# PowerShell-Email-Script
+
+<#
+.SYNOPSIS
+Reminds user running the script via email
+#>
+<#
+.DESCRIPTION
+This script notifys a user via emial to remind them of anything.
+
+The user can enter the script and change the Subject and Body of the email.
+
+The user can also enter the script to change where they want the email to be sent and where it's from. Just make sure the SMTP server and port is changed if necessary.
+
+First, you will be emailed right away showing the script is working and giving you a intial reminder.
+
+Next, you will be prompted for input on desired reminder date and time, and task name. You can skip these if wanted by hitting ENTER.
+
+After the prompts, a task will be created, (if desired) a path to the script will be shown to either make edits or fix any unexpected erros.
+
+Lastly, a password encryption test will be displayed showing the password taken from the file is encrypted unlike the fake password.
+#>
+<#
+.EXAMPLE
+C:\Users\bengi\OneDrive\Documents\FinalProject\EmailScript.ps1
+#>
+
+#UserEmail is essentially the username#
+$UserEmail = "bensellnowmidstate@hotmail.com"
+
+#EmialTo is used with Send-MailMessage for -To#
+$EmailTo = "bensellnowmidstate@hotmail.com"
+
+#SMTPServer variable is used with the Send-MailMessage and is needed to know where the email is going to be sent#
+$SMTPServer = "smtp.office365.com"
+
+#Variable used in Send-MailMessage for the subject of the email#
+$Subject = "Birthday Reminder"
+
+#Variable used in Send-MailMessage for the Body of the email#
+$Body = "Hailey's Birthday is on October 10! DO NOT FORGET!"
+
+#EDIT NOT IN VIDEO: If you wish for the password to run like in video you must run this command for the file your password is in. Command: read-host -assecurestring | convertfrom-securestring | out-file C:\SecureString.txt. Passwords shouldn't be visable within the script. To make this possible I move the password to an encrypted file named "SecureString" and had the password taken from the file#
+$password = Get-Content "C:\Users\bengi\OneDrive\Documents\FinalProject\SecureString.txt" | ConvertTo-SecureString
+
+#Automatically applies the username and password information into the credential popup. To not only save time and allow for a background task to be run without manual credential input#
+$credentials = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $UserEmail, $password
+
+#This entire combined section condenses all previously used parameters (except for port, which is needed to send the emial) and combines them into one#
+	$mailParameter = @{
+		To= "bensellnowmidstate@hotmail.com"
+		From= "bensellnowmidstate@hotmail.com"
+		Subject= $Subject
+		Body= $Body
+		SmtpServer= $SMTPServer
+		Port= 587
+		Credential= $credentials
+	}
+
+	#Uses all the combined variables and allows me to only need to type @mailParameter instead of a long list of parameters#
+	Send-MailMessage @mailParameter -UseSsl
+	
+	#The path of my script in a variable so it can be used for a scheduled task#
+	$ScriptPath = "C:\Users\bengi\OneDrive\Documents\FinalProject\EmailScript.ps1"
+
+	#Time variable set so user can be prompted for what specific date and time they want their reminder#
+	$Time = Read-Host -Prompt "Enter a Date and Time for your reminder! x/x/xxxx format for date, x:xx AM/PM for time. Or press ENTER to dismiss prompt"
+
+	#The trigger variable for my task is once at a date and time of my choosing#
+	$Trigger = New-ScheduledTaskTrigger -Once -At $Time
+
+	#The action variable is like pulling the trigger and running powershell which then runs my script. Some bypasses needed for when user is not present#
+	$Action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-executionpolicy bypass -noprofile -file $ScriptPath"
+
+	#TaskName variable is used because a new task needs to be created every time the script is ran. This allows the user to change that value without needing to enter the script itself#
+	$TaskName = Read-Host "Enter a desired task name, MANDATORY if scheduling a reminder. Hit ENTER to dismiss"
+
+	#This line registers the task by giving it a name and sets the trigger and action variable. The user is needed for powershell to know who is running the script, in this case USERNAME is my windows account. A Format-Table command is used to make the task table look better#
+	Register-ScheduledTask -TaskName $TaskName -Trigger $Trigger -User $env:USERNAME -Action $Action | Format-Table -AutoSize
+
+	#In case of any problems the file path to the script is listed to make edits or change any unexpected errors#
+	Get-ChildItem -Recurse "C:\Users\bengi\OneDrive\Documents\FinalProject\" -Exclude *.txt | Where { ! $_.PSIsContainer } | select Name,FullName,Length
+
+	#Compares a file with a non-encrypted fake password with the actual encrypted password being used. Visually shows user password is protected#
+	Compare-Object -ReferenceObject $(Get-Content C:\Users\bengi\OneDrive\Documents\FinalProject\SecureString.txt) -DifferenceObject $(Get-Content C:\Users\bengi\OneDrive\Documents\FinalProject\SecureString2.txt) -IncludeEqual | Format-List
+
+
+	#Informs user on what the comparison list of passwords is, and  tells the, the password is encrypted#
+	Write-Host "Password being used is encrypted! Fake password is from a seperate non-encrypted file as a test!"
+
+	#Thank you note to user that runs my script#
+	Write-Host "Thank you for running my script!" -ForegroundColor Green
